@@ -1,3 +1,8 @@
+# Config files
+sheet_id.json
+token.json
+credentials.json
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
