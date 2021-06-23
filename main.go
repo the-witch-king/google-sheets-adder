@@ -13,8 +13,19 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
+func getSheetId(path string) string {
+    savedId, err := sheetIdFromFile(path)
+
+    if err != nil {
+        savedId = saveSheetId(path)
+    }
+
+    return savedId
+}
+
 func sheetIdFromFile(path string) (string, error) {
     f, err := os.Open(path)
+    // Unable to open file
     if err != nil {
         return "", err
     }
@@ -25,7 +36,6 @@ func sheetIdFromFile(path string) (string, error) {
 
 func saveSheetId(path string) string {
     var sId string
-    fmt.Printf("Saving Sheet ID file to: %s\n", path)
     f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 
     if err != nil {
@@ -35,7 +45,7 @@ func saveSheetId(path string) string {
     fmt.Println("Please enter the Google Sheet ID where you would like to save verbs: ")
 
     if _, err := fmt.Scan(&sId); err != nil {
-        log.Fatalf("Unable to read Sheet ID: %v", err)
+        log.Fatalf("Unable to read Sheet ID from user input: %v", err)
     }
 
     defer f.Close()
@@ -72,11 +82,7 @@ func main() {
 		log.Fatalf("Unable to retrieve Sheets client: %v", err)
 	}
 
-    spreadsheetId, err := sheetIdFromFile("sheet_id.json")
-
-    if err != nil {
-        spreadsheetId = saveSheetId("sheet_id.json")
-    }
+    spreadsheetId := getSheetId("sheet_id.json")
 
 	v := make([][]interface{}, len(verbs))
     for i, verb := range verbs {
@@ -89,8 +95,12 @@ func main() {
 	_, e := srv.Spreadsheets.Values.Append(spreadsheetId, "A3", values).ValueInputOption("raw").Do()
 
 	if e != nil {
-		log.Fatalf("Uh oh: %v", e)
+		log.Fatalf("API Error: %v", e)
 	}
 
-	fmt.Println("Added.")
+    fmt.Printf("Added:\n")
+
+    for _, v := range verbs {
+        fmt.Printf(" - %s\n", v)
+    }
 }
