@@ -74,12 +74,13 @@ func removeCredentialsFiles() {
     if c == "y" || c == "yes" {
         paths := []string{"token.json", "credentials.json", "sheet_id.json"}
         for _, p := range paths {
-            fmt.Println("Removing %s.", p)
 
             err := os.Remove(p)
             if err != nil {
-                log.Fatalf("Unable to remove file \"%s\"\n. Aborting.", p)
+                log.Fatalf("Unable to remove file \"%s\". Aborting.", p)
             }
+
+            fmt.Printf("Removed %s.\n", p)
         }
         return
     }
