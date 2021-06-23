@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+    "flag"
+    "strings"
 
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
@@ -29,6 +31,7 @@ func sheetIdFromFile(path string) (string, error) {
     if err != nil {
         return "", err
     }
+
     var s string
     err = json.NewDecoder(f).Decode(&s)
     return s, err
@@ -36,16 +39,16 @@ func sheetIdFromFile(path string) (string, error) {
 
 func saveSheetId(path string) string {
     var sId string
+    
+    fmt.Println("Please enter the Google Sheet ID where you would like to save verbs: ")
+    if _, err := fmt.Scan(&sId); err != nil {
+        log.Fatalf("Unable to read Sheet ID from user input: %v", err)
+    }
+
     f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 
     if err != nil {
         log.Fatalf("Unable to open Sheet ID file: %v", err)
-    }
-
-    fmt.Println("Please enter the Google Sheet ID where you would like to save verbs: ")
-
-    if _, err := fmt.Scan(&sId); err != nil {
-        log.Fatalf("Unable to read Sheet ID from user input: %v", err)
     }
 
     defer f.Close()
@@ -58,12 +61,53 @@ func saveSheetId(path string) string {
     return sId
 }
 
+func removeCredentialsFiles() {
+    var c string
+    fmt.Println("Are you sure you want to clear the credentials? This will remove the auth credentials, Oauth token, and your Sheet ID. [y/n]")
+
+    if _, err := fmt.Scan(&c); err != nil {
+        log.Fatalf("Unable to read user input.")
+    }
+
+    c = strings.ToLower(c)
+    
+    if c == "y" || c == "yes" {
+        paths := []string{"token.json", "credentials.json", "sheet_id.json"}
+        for _, p := range paths {
+            fmt.Println("Removing %s.", p)
+
+            err := os.Remove(p)
+            if err != nil {
+                log.Fatalf("Unable to remove file \"%s\"\n. Aborting.", p)
+            }
+        }
+        return
+    }
+
+    fmt.Println("Credentials were *NOT* cleared.")
+}
+
 func main() {
-	if len(os.Args) < 2 {
+    // Clear tokens, auth, and sheet id subcommand
+    if len(os.Args) < 2 {
+		log.Fatal("Please provide at least one verb to add to your Google Sheet")
+    }
+
+    sc := os.Args[1]
+    if strings.ToLower(sc) == "clear" {
+        removeCredentialsFiles()
+        os.Exit(0)
+    }
+
+    newIdPtr := flag.Bool("id", false, "Provide this flag if you'd like to clear the saved sheet id.")
+    flag.Parse()
+
+    verbs := flag.Args()
+
+	if len(verbs) == 0 {
 		log.Fatal("Please provide at least one verb to add to your Google Sheet")
 	}
 
-    verbs := os.Args[1:]
 
 	ctx := context.Background()
 	b, err := ioutil.ReadFile("credentials.json")
@@ -75,14 +119,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to parse client secret file to config: %v", err)
 	}
-	client := getClient(config)
+	client := getClient(config, "token.json")
 
 	srv, err := sheets.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		log.Fatalf("Unable to retrieve Sheets client: %v", err)
 	}
 
-    spreadsheetId := getSheetId("sheet_id.json")
+    var spreadsheetId string
+    if *newIdPtr == true {
+        spreadsheetId = saveSheetId("sheet_id.json") 
+    } else {
+        spreadsheetId = getSheetId("sheet_id.json")
+    }
 
 	v := make([][]interface{}, len(verbs))
     for i, verb := range verbs {
